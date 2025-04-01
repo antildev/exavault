@@ -1,18 +1,31 @@
 'use client'
 
-import { useState, useRef } from "react"
-import { X } from "lucide-react"
+import { useState, useRef, useEffect, useTransition, ChangeEvent, DragEvent } from "react"
+import { X, Upload, Loader2 } from "lucide-react"
+import { Button } from "./ui/button"
+import { uploadFiles, listFiles } from "@/utils/supabase/client"
+import { FileObject } from "@supabase/storage-js"
+import { useGlobalContext } from "@/context/global.context"
 
 export default function FileUpload() {
   const [dragging, setDragging] = useState(false)
   const [files, setFiles] = useState<FileList | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const inputFileRef = useRef<HTMLInputElement>(null)
+  const [isPending, startTransition] = useTransition()
+  const { value, setValue } = useGlobalContext()
+
+  const user = 'example@gmail.com'
+  const path = `public/${user}/files`
+
+  useEffect(() => {
+    if (files?.length == 0) setFiles(null)
+  }, [files])
 
   const handleFileClick = () => {
-    fileRef.current?.click()
+    inputFileRef.current?.click()
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     e.preventDefault()
 
     setFiles(e.target.files)
@@ -20,17 +33,17 @@ export default function FileUpload() {
     if (!files) return
   }
   
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragging(true)
   }
 
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragging(false)
   }
 
-  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = async (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
 
     setDragging(false)
@@ -39,7 +52,7 @@ export default function FileUpload() {
     if (!files) return
   }
 
-  const removeFile = (name: string) => {
+  const handleUnselect = (name: string) => {
     if (!files) return null
 
     const filesArray = Array.from(files)
@@ -48,7 +61,21 @@ export default function FileUpload() {
     const dataTransfer = new DataTransfer()
     filteredFilesArray.forEach(file => dataTransfer.items.add(file))
     
-    setFiles(dataTransfer.files)
+    setFiles(dataTransfer.files) 
+  }
+
+  const handleFileUpload = () => {
+   startTransition(async () => {
+    const results = await uploadFiles({
+      path: path + '/',
+      files: files
+    })
+
+    const listedFiles = await listFiles(path)
+    setValue(listedFiles)
+
+    console.log(results)
+   })
   }
 
   return (
@@ -60,29 +87,50 @@ export default function FileUpload() {
         onDrop={handleDrop}
         className={`
           border-2 p-[1.5rem] text-center rounded-md cursor-pointer transition-all duration-300 ease-in
-          ${dragging ? 'border-2 border-blue-500' : 'border-dashed border-gray-400'}
+          ${dragging ? 'border-2 border-blue-500 bg-primary/20' : 'border-dashed border-gray-400'}
         `}
       >
-        <input type='file' multiple hidden ref={fileRef} onChange={handleFileSelect}/>
+        <input type='file' multiple hidden ref={inputFileRef} onChange={handleFileSelect}/>
         {dragging ? 'Drop the file here...' : 'Drag and drop a file here...'}
       </div>
 
-      <div className={`h-30 p-[1rem] overflow-auto ${files ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`h-30 p-[1rem] overflow-auto`}>
         {
           files && (
             <>
-              <h2 className='text-xl'>Selected files:</h2>
+              <h2 className='text-xl'>Selected files</h2>
               {
                 [...files].map((file, index) => (
                   <div key={`${file.name}-${index}`} className='flex gap-1 items-center'>
+                    <X className='hover:bg-red-500 hover:rounded-md p-0.5' onClick={() => handleUnselect(file.name)}/>
                     <span>{file.name}</span>
-                    <X className='hover:bg-red-500 hover:rounded-md p-0.5' onClick={() => removeFile(file.name)}/>
                   </div>
                 ))
               }
             </>
           )
         }
+      </div>
+      <div className="flex items-center justify-center">
+        <Button onClick={handleFileUpload} disabled={!files || isPending}>
+          {
+            isPending ?
+            (
+              <>
+                <Loader2 className="animate-spin" />
+                <span>Uploading files</span>
+              </>
+            )
+            :
+            (
+              <>
+                <Upload />
+                <span>Upload files</span>
+              </>
+            )
+          }
+          
+        </Button>
       </div>
     </>
   )

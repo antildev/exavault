@@ -1,7 +1,11 @@
 import FileUpload from "@/components/FileUpload"
+import FileListing from "@/components/FileListing"
 
-export default function dashboard() {
+export default function Dashboard() {
   return (
-    <FileUpload />
+    <>
+      <FileUpload />
+      <FileListing />
+    </>
   )
 }
