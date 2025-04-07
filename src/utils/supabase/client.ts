@@ -10,17 +10,35 @@ type UploadProps = {
   files: FileList | null
 }
 
+type ErrorType = {
+  statusCode: string
+  error: string
+  message: string
+}
+
 export const uploadFiles = async ({ path, files }: UploadProps) => {
   if (!files) return
 
   const results = []
+
+  const fileSizeLimit = 4194304
+  let totalFileSize = 0
   
   for (let i = 0; i < files.length; i++) {
     const file = files[i]
+    totalFileSize += files[i].size
 
     try {
+      if (totalFileSize > fileSizeLimit) {
+        const error = new Error("File(s) too big or not enough space. Maximum upload size: 5MB") as Error & ErrorType
+        error.error = "Payload too large"
+        error.statusCode = "413"
+
+        throw error
+      }
+
       const { data, error } = await supabase.storage
-        .from('exavault-bucket')
+        .from("exavault-bucket")
         .upload(`${path}${file.name}`, file)
 
       if (error) throw error
@@ -32,7 +50,7 @@ export const uploadFiles = async ({ path, files }: UploadProps) => {
     } catch (error) {
       results.push({
         filename: file.name,
-        error: error,
+        error: error as ErrorType,
         success: false
       })
     }
@@ -43,7 +61,7 @@ export const uploadFiles = async ({ path, files }: UploadProps) => {
 
 export const listFiles = async (path: string) => {
   const { data, error } = await supabase.storage
-    .from('exavault-bucket')
+    .from("exavault-bucket")
     .list(path)
 
   return data

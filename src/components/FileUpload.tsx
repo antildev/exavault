@@ -1,23 +1,29 @@
-'use client'
+"use client"
 
 import { useState, useRef, useEffect, useTransition, ChangeEvent, DragEvent } from "react"
 import { X, Upload, Loader2 } from "lucide-react"
 import { Button } from "./ui/button"
 import { uploadFiles, listFiles } from "@/utils/supabase/client"
-import { FileObject } from "@supabase/storage-js"
 import { useGlobalContext } from "@/context/global.context"
+
+type ErrorType = {
+  fileName: string
+  error: string | undefined
+}
 
 export default function FileUpload() {
   const [dragging, setDragging] = useState(false)
   const [files, setFiles] = useState<FileList | null>(null)
+  const [errors, setErrors] = useState<ErrorType[] | undefined>(undefined)
   const inputFileRef = useRef<HTMLInputElement>(null)
   const [isPending, startTransition] = useTransition()
   const { value, setValue } = useGlobalContext()
 
-  const user = 'example@gmail.com'
+  const user = "example@gmail.com"
   const path = `public/${user}/files`
 
   useEffect(() => {
+    console.log(files)
     if (files?.length == 0) setFiles(null)
   }, [files])
 
@@ -67,7 +73,7 @@ export default function FileUpload() {
   const handleFileUpload = () => {
    startTransition(async () => {
     const results = await uploadFiles({
-      path: path + '/',
+      path: path + "/",
       files: files
     })
 
@@ -75,6 +81,23 @@ export default function FileUpload() {
     setValue(listedFiles)
 
     console.log(results)
+
+    const hasError = results?.some(result => !result.success)
+    if (hasError) {
+      const errorMessages = results?.filter(result => !result.success)
+        .map(result => ({
+          fileName: result.filename, 
+          error: result.error?.message
+        }))
+      
+      setErrors(undefined)  
+      setErrors(errorMessages)
+
+      return
+    }
+
+    setErrors(undefined)    
+    window.alert("Files uplodaded succesfully")
    })
   }
 
@@ -87,27 +110,36 @@ export default function FileUpload() {
         onDrop={handleDrop}
         className={`
           border-2 p-[1.5rem] text-center rounded-md cursor-pointer transition-all duration-300 ease-in
-          ${dragging ? 'border-2 border-blue-500 bg-primary/20' : 'border-dashed border-gray-400'}
+          ${dragging ? "border-2 border-blue-500 bg-primary/20" : "border-dashed border-gray-400"}
         `}
       >
-        <input type='file' multiple hidden ref={inputFileRef} onChange={handleFileSelect}/>
-        {dragging ? 'Drop the file here...' : 'Drag and drop a file here...'}
+        <input type="file" multiple hidden ref={inputFileRef} onChange={handleFileSelect}/>
+        {dragging ? "Drop the file here..." : "Drag and drop a file here..."}
       </div>
 
-      <div className={`h-30 p-[1rem] overflow-auto`}>
+      <div className="h-30 p-[1rem] overflow-auto">
         {
           files && (
             <>
-              <h2 className='text-xl'>Selected files</h2>
+              <h2 className="text-xl">Selected files</h2>
               {
                 [...files].map((file, index) => (
-                  <div key={`${file.name}-${index}`} className='flex gap-1 items-center'>
-                    <X className='hover:bg-red-500 hover:rounded-md p-0.5' onClick={() => handleUnselect(file.name)}/>
+                  <div key={`${file.name}-${index}`} className="flex gap-1 items-center">
+                    <X className="hover:bg-red-500 hover:rounded-md p-0.5" onClick={() => handleUnselect(file.name)}/>
                     <span>{file.name}</span>
                   </div>
                 ))
               }
             </>
+          )
+        }
+      </div>
+      <div className="h-30 p-[1rem] overflow-auto text-red-500">
+        {
+          errors && (
+            errors.map(error => (
+              <p>{error.error}</p>
+            ))
           )
         }
       </div>
